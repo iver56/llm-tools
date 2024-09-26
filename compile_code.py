@@ -102,8 +102,8 @@ def main():
         print("No candidate files found.")
         return
 
-    # Initialize preselected_files as empty
-    preselected_files = []
+    # Initialize preselected_files as an empty set
+    preselected_files = set()
 
     # Only get the list of changed files if not omitting the diff
     if not args.no_diff:
@@ -132,26 +132,24 @@ def main():
             os.chdir(original_cwd)
 
             # Filter changed files to include only candidate files with specified extensions
-            preselected_files = [
+            preselected_files = {
                 f
                 for f in changed_files_relative
                 if f in candidate_files and any(f.endswith(ext) for ext in extensions)
-            ]
+            }
 
         except Exception as e:
             print(f"Error obtaining list of changed files: {e}")
-            preselected_files = []
+            preselected_files = set()
     else:
         # If diff is omitted, disregard the commit and do not preselect any files
-        preselected_files = []
+        preselected_files = set()
 
     # Create choices for the checkbox prompt, without pre-selecting any files if diff is omitted
-    choices = []
-    for file in candidate_files:
-        if file in preselected_files:
-            choices.append(Choice(title=file, checked=True))
-        else:
-            choices.append(Choice(title=file))
+    choices = [
+        Choice(title=file, checked=(file in preselected_files))
+        for file in candidate_files
+    ]
 
     # Interactive selection of files
     selected_files = checkbox(
