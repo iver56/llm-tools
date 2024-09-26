@@ -10,6 +10,7 @@ def main():
     parser.add_argument('path', type=str, help='Path to the repository')
     parser.add_argument('-o', '--output', type=str, default='code.txt', help='Output file name (default: code.txt)')
     parser.add_argument('-e', '--exclude', nargs='*', default=[], help='List of directories to exclude')
+    parser.add_argument('-m', '--message', type=str, help='Message to append at the end of the output file')
 
     args = parser.parse_args()
 
@@ -31,8 +32,8 @@ def main():
                     relative_path = os.path.relpath(file_path, repo_path)
                     # Write the relative file path to the output file
                     outfile.write(f"{relative_path}\n")
-                    # Wrap the file content in triple backticks
-                    outfile.write('```\n')
+                    # Wrap the file content in triple backticks with language identifier
+                    outfile.write('```python\n')
                     try:
                         with open(file_path, 'r', encoding='utf-8') as infile:
                             outfile.write(infile.read())
@@ -66,6 +67,12 @@ def main():
         except Exception as e:
             print(f"Error obtaining git diff: {e}")
             outfile.write("Error obtaining git diff.\n")
+
+        # Append the user-provided message at the end
+        if args.message:
+            outfile.write("\n")
+            outfile.write(args.message)
+            outfile.write("\n")
 
 if __name__ == '__main__':
     main()
