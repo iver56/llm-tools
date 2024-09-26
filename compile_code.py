@@ -6,7 +6,7 @@ import subprocess
 
 def main():
     try:
-        import questionary
+        from questionary import checkbox, Choice
     except ImportError:
         print("The 'questionary' library is required for interactive file selection.")
         print("Please install it using 'pip install questionary' and try again.")
@@ -34,14 +34,50 @@ def main():
         for file in files:
             if file.endswith('.py'):
                 file_path = os.path.join(root, file)
-                # Compute the relative file path
+                # Compute the relative file path and normalize it
                 relative_path = os.path.relpath(file_path, repo_path)
+                relative_path = os.path.normpath(relative_path)
                 candidate_files.append(relative_path)
 
-    # Interactive selection of files
-    selected_files = questionary.checkbox(
+    # Get the list of files changed in the latest git commit
+    try:
+        # Change current working directory to repo_path
+        original_cwd = os.getcwd()
+        os.chdir(repo_path)
+
+        # Get the list of changed files
+        result = subprocess.run(['git', 'diff', '--name-only', 'HEAD~1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if result.returncode != 0:
+            print("Error getting list of changed files:", result.stderr)
+            changed_files = []
+        else:
+            changed_files = result.stdout.strip().split('\n')
+
+        # Normalize the paths and ensure they are relative to repo_path
+        changed_files_relative = [os.path.normpath(f) for f in changed_files]
+
+        # Change back to original directory
+        os.chdir(original_cwd)
+
+    except Exception as e:
+        print(f"Error obtaining list of changed files: {e}")
+        changed_files_relative = []
+
+    # Filter changed files to include only .py files in candidate_files
+    preselected_files = [f for f in changed_files_relative if f in candidate_files and f.endswith('.py')]
+
+    # Create choices for the checkbox prompt, pre-selecting changed files
+    choices = []
+    for file in candidate_files:
+        if file in preselected_files:
+            choices.append(Choice(title=file, checked=True))
+        else:
+            choices.append(Choice(title=file))
+
+    # Interactive selection of files with pre-selected files
+    selected_files = checkbox(
         "Select the files to include in the output (use space to select, enter to confirm):",
-        choices=candidate_files
+        choices=choices
     ).ask()
 
     if not selected_files:
