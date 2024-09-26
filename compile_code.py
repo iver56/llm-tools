@@ -12,6 +12,13 @@ def main():
         print("Please install it using 'pip install questionary' and try again.")
         return
 
+    try:
+        import pathspec
+    except ImportError:
+        print("The 'pathspec' library is required to parse .gitignore files.")
+        print("Please install it using 'pip install pathspec' and try again.")
+        return
+
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Compile selected .py files from a specified directory into a single file.')
     parser.add_argument('path', type=str, help='Path to the repository')
@@ -26,6 +33,15 @@ def main():
     output_file = args.output
     excluded_dirs = set(args.exclude)
 
+    # Load .gitignore patterns
+    gitignore_path = os.path.join(repo_path, '.gitignore')
+    if os.path.exists(gitignore_path):
+        with open(gitignore_path, 'r') as f:
+            gitignore_content = f.read()
+        spec = pathspec.PathSpec.from_lines('gitwildmatch', gitignore_content.splitlines())
+    else:
+        spec = None
+
     # Collect all candidate .py files
     candidate_files = []
     for root, dirs, files in os.walk(repo_path):
@@ -34,10 +50,17 @@ def main():
         for file in files:
             if file.endswith('.py'):
                 file_path = os.path.join(root, file)
-                # Compute the relative file path and normalize it
+                # Compute the path relative to repo root
                 relative_path = os.path.relpath(file_path, repo_path)
                 relative_path = os.path.normpath(relative_path)
+                # Check if file is ignored by .gitignore
+                if spec and spec.match_file(relative_path):
+                    continue  # Skip ignored files
                 candidate_files.append(relative_path)
+
+    if not candidate_files:
+        print("No candidate files found.")
+        return
 
     # Get the list of files changed in the latest git commit
     try:
@@ -53,7 +76,7 @@ def main():
         else:
             changed_files = result.stdout.strip().split('\n')
 
-        # Normalize the paths and ensure they are relative to repo_path
+        # Normalize the paths
         changed_files_relative = [os.path.normpath(f) for f in changed_files]
 
         # Change back to original directory
@@ -102,7 +125,6 @@ def main():
         # Append the diff of the latest git commit
         try:
             # Change current working directory to repo_path
-            original_cwd = os.getcwd()
             os.chdir(repo_path)
 
             # Get the diff of the latest commit
