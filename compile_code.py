@@ -26,6 +26,7 @@ def main():
     parser.add_argument('-e', '--exclude', nargs='*', default=[], help='List of directories to exclude')
     parser.add_argument('-m', '--message', type=str, help='Message to append at the end of the output file')
     parser.add_argument('--extensions', nargs='+', default=['.py', '.md'], help='List of file extensions to include (default: .py .md)')
+    parser.add_argument('--commit', type=str, default='HEAD~1', help='Git commit to use for the diff (default: HEAD~1)')
 
     args = parser.parse_args()
 
@@ -34,6 +35,7 @@ def main():
     output_file = args.output
     excluded_dirs = set(args.exclude)
     extensions = args.extensions
+    commit = args.commit
 
     # Ensure extensions start with a dot
     extensions = [ext if ext.startswith('.') else '.' + ext for ext in extensions]
@@ -67,14 +69,14 @@ def main():
         print("No candidate files found.")
         return
 
-    # Get the list of files changed in the latest git commit
+    # Get the list of files changed in the specified git commit
     try:
         # Change current working directory to repo_path
         original_cwd = os.getcwd()
         os.chdir(repo_path)
 
         # Get the list of changed files
-        result = subprocess.run(['git', 'diff', '--name-only', 'HEAD~1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(['git', 'diff', '--name-only', commit], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if result.returncode != 0:
             print("Error getting list of changed files:", result.stderr)
             changed_files = []
@@ -136,14 +138,13 @@ def main():
                 print(f"Error reading {file_path}: {e}")
             outfile.write('\n```\n\n')  # Close the code block and add separation
 
-        # Append the diff of the latest git commit
+        # Append the diff of the specified git commit
         try:
             # Change current working directory to repo_path
-
             os.chdir(repo_path)
 
-            # Get the diff of the latest commit
-            result = subprocess.run(['git', 'diff', 'HEAD~1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            # Get the diff of the specified commit
+            result = subprocess.run(['git', 'diff', commit], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if result.returncode != 0:
                 print("Error getting git diff:", result.stderr)
                 diff_output = ''
@@ -154,7 +155,7 @@ def main():
             os.chdir(original_cwd)
 
             # Write the diff to the output file
-            outfile.write("This is the diff of the latest commit:\n")
+            outfile.write(f"This is the diff of the commit '{commit}':\n")
             outfile.write('```\n')
             outfile.write(diff_output)
             outfile.write('\n```\n')
