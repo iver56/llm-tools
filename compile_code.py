@@ -4,6 +4,7 @@ import os
 import argparse
 import subprocess
 
+
 def main():
     try:
         from questionary import checkbox, Choice
@@ -20,13 +21,38 @@ def main():
         return
 
     # Set up argument parser
-    parser = argparse.ArgumentParser(description='Compile selected files from a specified directory into a single file.')
-    parser.add_argument('path', type=str, help='Path to the repository')
-    parser.add_argument('-o', '--output', type=str, default='code.txt', help='Output file name (default: code.txt)')
-    parser.add_argument('-e', '--exclude', nargs='*', default=[], help='List of directories to exclude')
-    parser.add_argument('-m', '--message', type=str, help='Message to append at the end of the output file')
-    parser.add_argument('--extensions', nargs='+', default=['.py', '.md'], help='List of file extensions to include (default: .py .md)')
-    parser.add_argument('--commit', type=str, default='HEAD~1', help='Git commit to use for the diff (default: HEAD~1)')
+    parser = argparse.ArgumentParser(
+        description="Compile selected files from a specified directory into a single file."
+    )
+    parser.add_argument("path", type=str, help="Path to the repository")
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default="code.txt",
+        help="Output file name (default: code.txt)",
+    )
+    parser.add_argument(
+        "-e", "--exclude", nargs="*", default=[], help="List of directories to exclude"
+    )
+    parser.add_argument(
+        "-m",
+        "--message",
+        type=str,
+        help="Message to append at the end of the output file",
+    )
+    parser.add_argument(
+        "--extensions",
+        nargs="+",
+        default=[".py", ".md"],
+        help="List of file extensions to include (default: .py .md)",
+    )
+    parser.add_argument(
+        "--commit",
+        type=str,
+        default="HEAD~1",
+        help="Git commit to use for the diff (default: HEAD~1)",
+    )
 
     args = parser.parse_args()
 
@@ -38,14 +64,16 @@ def main():
     commit = args.commit
 
     # Ensure extensions start with a dot
-    extensions = [ext if ext.startswith('.') else '.' + ext for ext in extensions]
+    extensions = [ext if ext.startswith(".") else "." + ext for ext in extensions]
 
     # Load .gitignore patterns
-    gitignore_path = os.path.join(repo_path, '.gitignore')
+    gitignore_path = os.path.join(repo_path, ".gitignore")
     if os.path.exists(gitignore_path):
-        with open(gitignore_path, 'r') as f:
+        with open(gitignore_path, "r") as f:
             gitignore_content = f.read()
-        spec = pathspec.PathSpec.from_lines('gitwildmatch', gitignore_content.splitlines())
+        spec = pathspec.PathSpec.from_lines(
+            "gitwildmatch", gitignore_content.splitlines()
+        )
     else:
         spec = None
 
@@ -76,12 +104,17 @@ def main():
         os.chdir(repo_path)
 
         # Get the list of changed files
-        result = subprocess.run(['git', 'diff', '--name-only', commit], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(
+            ["git", "diff", "--name-only", commit],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
         if result.returncode != 0:
             print("Error getting list of changed files:", result.stderr)
             changed_files = []
         else:
-            changed_files = result.stdout.strip().split('\n')
+            changed_files = result.stdout.strip().split("\n")
 
         # Normalize the paths
         changed_files_relative = [os.path.normpath(f) for f in changed_files]
@@ -94,7 +127,11 @@ def main():
         changed_files_relative = []
 
     # Filter changed files to include only files in candidate_files with specified extensions
-    preselected_files = [f for f in changed_files_relative if f in candidate_files and any(f.endswith(ext) for ext in extensions)]
+    preselected_files = [
+        f
+        for f in changed_files_relative
+        if f in candidate_files and any(f.endswith(ext) for ext in extensions)
+    ]
 
     # Create choices for the checkbox prompt, pre-selecting changed files
     choices = []
@@ -107,7 +144,7 @@ def main():
     # Interactive selection of files with pre-selected files
     selected_files = checkbox(
         "Select the files to include in the output (use space to select, enter to confirm):",
-        choices=choices
+        choices=choices,
     ).ask()
 
     if not selected_files:
@@ -115,28 +152,28 @@ def main():
         return
 
     # Open the output file in write mode
-    with open(output_file, 'w', encoding='utf-8') as outfile:
+    with open(output_file, "w", encoding="utf-8") as outfile:
         for relative_path in selected_files:
             file_path = os.path.join(repo_path, relative_path)
             # Write the relative file path to the output file
             outfile.write(f"{relative_path}\n")
             # Determine the language for syntax highlighting
             file_extension = os.path.splitext(relative_path)[1]
-            language = ''
-            if file_extension == '.py':
-                language = 'python'
-            elif file_extension == '.md':
-                language = 'markdown'
-            elif file_extension == '.txt':
-                language = 'plaintext'
+            language = ""
+            if file_extension == ".py":
+                language = "python"
+            elif file_extension == ".md":
+                language = "markdown"
+            elif file_extension == ".txt":
+                language = "plaintext"
             # Wrap the file content in triple backticks with language identifier
-            outfile.write(f'```{language}\n')
+            outfile.write(f"```{language}\n")
             try:
-                with open(file_path, 'r', encoding='utf-8') as infile:
+                with open(file_path, "r", encoding="utf-8") as infile:
                     outfile.write(infile.read())
             except Exception as e:
                 print(f"Error reading {file_path}: {e}")
-            outfile.write('\n```\n\n')  # Close the code block and add separation
+            outfile.write("\n```\n\n")  # Close the code block and add separation
 
         # Append the diff of the specified git commit
         try:
@@ -144,10 +181,15 @@ def main():
             os.chdir(repo_path)
 
             # Get the diff of the specified commit
-            result = subprocess.run(['git', 'diff', commit], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(
+                ["git", "diff", commit],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
             if result.returncode != 0:
                 print("Error getting git diff:", result.stderr)
-                diff_output = ''
+                diff_output = ""
             else:
                 diff_output = result.stdout
 
@@ -156,9 +198,9 @@ def main():
 
             # Write the diff to the output file
             outfile.write(f"This is the diff of the commit '{commit}':\n")
-            outfile.write('```\n')
+            outfile.write("```\n")
             outfile.write(diff_output)
-            outfile.write('\n```\n')
+            outfile.write("\n```\n")
 
         except Exception as e:
             print(f"Error obtaining git diff: {e}")
@@ -170,5 +212,6 @@ def main():
             outfile.write(args.message)
             outfile.write("\n")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
