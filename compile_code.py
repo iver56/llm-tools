@@ -53,11 +53,10 @@ def main():
         default="HEAD~1",
         help="Git commit to use for the diff (default: HEAD~1)",
     )
-    # Add the new argument to omit the diff
     parser.add_argument(
         "--no-diff",
         action="store_true",
-        help="Omit the git diff in the output",
+        help="Omit the git diff in the output and disregard the commit",
     )
 
     args = parser.parse_args()
@@ -103,43 +102,50 @@ def main():
         print("No candidate files found.")
         return
 
-    # Get the list of files changed in the specified git commit
-    try:
-        # Change current working directory to repo_path
-        original_cwd = os.getcwd()
-        os.chdir(repo_path)
+    # Initialize preselected_files as empty
+    preselected_files = []
 
-        # Get the list of changed files
-        result = subprocess.run(
-            ["git", "diff", "--name-only", commit],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        if result.returncode != 0:
-            print("Error getting list of changed files:", result.stderr)
-            changed_files = []
-        else:
-            changed_files = result.stdout.strip().split("\n")
+    # Only get the list of changed files if not omitting the diff
+    if not args.no_diff:
+        try:
+            # Change current working directory to repo_path
+            original_cwd = os.getcwd()
+            os.chdir(repo_path)
 
-        # Normalize the paths
-        changed_files_relative = [os.path.normpath(f) for f in changed_files]
+            # Get the list of changed files
+            result = subprocess.run(
+                ["git", "diff", "--name-only", commit],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if result.returncode != 0:
+                print("Error getting list of changed files:", result.stderr)
+                changed_files = []
+            else:
+                changed_files = result.stdout.strip().split("\n")
 
-        # Change back to original directory
-        os.chdir(original_cwd)
+            # Normalize the paths
+            changed_files_relative = [os.path.normpath(f) for f in changed_files]
 
-    except Exception as e:
-        print(f"Error obtaining list of changed files: {e}")
-        changed_files_relative = []
+            # Change back to original directory
+            os.chdir(original_cwd)
 
-    # Filter changed files to include only files in candidate_files with specified extensions
-    preselected_files = [
-        f
-        for f in changed_files_relative
-        if f in candidate_files and any(f.endswith(ext) for ext in extensions)
-    ]
+            # Filter changed files to include only candidate files with specified extensions
+            preselected_files = [
+                f
+                for f in changed_files_relative
+                if f in candidate_files and any(f.endswith(ext) for ext in extensions)
+            ]
 
-    # Create choices for the checkbox prompt, pre-selecting changed files
+        except Exception as e:
+            print(f"Error obtaining list of changed files: {e}")
+            preselected_files = []
+    else:
+        # If diff is omitted, disregard the commit and do not preselect any files
+        preselected_files = []
+
+    # Create choices for the checkbox prompt, without pre-selecting any files if diff is omitted
     choices = []
     for file in candidate_files:
         if file in preselected_files:
@@ -147,7 +153,7 @@ def main():
         else:
             choices.append(Choice(title=file))
 
-    # Interactive selection of files with pre-selected files
+    # Interactive selection of files
     selected_files = checkbox(
         "Select the files to include in the output (use space to select, enter to confirm):",
         choices=choices,
