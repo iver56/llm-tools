@@ -53,6 +53,12 @@ def main():
         default="HEAD~1",
         help="Git commit to use for the diff (default: HEAD~1)",
     )
+    # Add the new argument to omit the diff
+    parser.add_argument(
+        "--no-diff",
+        action="store_true",
+        help="Omit the git diff in the output",
+    )
 
     args = parser.parse_args()
 
@@ -175,36 +181,37 @@ def main():
                 print(f"Error reading {file_path}: {e}")
             outfile.write("\n```\n\n")  # Close the code block and add separation
 
-        # Append the diff of the specified git commit
-        try:
-            # Change current working directory to repo_path
-            os.chdir(repo_path)
+        # Append the diff of the specified git commit if not omitted
+        if not args.no_diff:
+            try:
+                # Change current working directory to repo_path
+                os.chdir(repo_path)
 
-            # Get the diff of the specified commit
-            result = subprocess.run(
-                ["git", "diff", commit],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            if result.returncode != 0:
-                print("Error getting git diff:", result.stderr)
-                diff_output = ""
-            else:
-                diff_output = result.stdout
+                # Get the diff of the specified commit
+                result = subprocess.run(
+                    ["git", "diff", commit],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    print("Error getting git diff:", result.stderr)
+                    diff_output = ""
+                else:
+                    diff_output = result.stdout
 
-            # Change back to original directory
-            os.chdir(original_cwd)
+                # Change back to original directory
+                os.chdir(original_cwd)
 
-            # Write the diff to the output file
-            outfile.write(f"This is the diff of the commit '{commit}':\n")
-            outfile.write("```\n")
-            outfile.write(diff_output)
-            outfile.write("\n```\n")
+                # Write the diff to the output file
+                outfile.write(f"This is the diff of the commit '{commit}':\n")
+                outfile.write("```\n")
+                outfile.write(diff_output)
+                outfile.write("\n```\n")
 
-        except Exception as e:
-            print(f"Error obtaining git diff: {e}")
-            outfile.write("Error obtaining git diff.\n")
+            except Exception as e:
+                print(f"Error obtaining git diff: {e}")
+                outfile.write("Error obtaining git diff.\n")
 
         # Append the user-provided message at the end
         if args.message:
