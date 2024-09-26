@@ -2,6 +2,7 @@
 
 import os
 import argparse
+import subprocess
 
 def main():
     # Set up argument parser
@@ -38,6 +39,33 @@ def main():
                     except Exception as e:
                         print(f"Error reading {file_path}: {e}")
                     outfile.write('\n```\n\n')  # Close the code block and add separation
+
+        # Append the diff of the latest git commit
+        try:
+            # Change current working directory to repo_path
+            original_cwd = os.getcwd()
+            os.chdir(repo_path)
+
+            # Get the diff of the latest commit
+            result = subprocess.run(['git', 'diff', 'HEAD~1'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode != 0:
+                print("Error getting git diff:", result.stderr)
+                diff_output = ''
+            else:
+                diff_output = result.stdout
+
+            # Change back to original directory
+            os.chdir(original_cwd)
+
+            # Write the diff to the output file
+            outfile.write("This is the diff of the latest commit:\n")
+            outfile.write('```\n')
+            outfile.write(diff_output)
+            outfile.write('\n```\n')
+
+        except Exception as e:
+            print(f"Error obtaining git diff: {e}")
+            outfile.write("Error obtaining git diff.\n")
 
 if __name__ == '__main__':
     main()
