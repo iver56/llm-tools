@@ -20,11 +20,12 @@ def main():
         return
 
     # Set up argument parser
-    parser = argparse.ArgumentParser(description='Compile selected .py files from a specified directory into a single file.')
+    parser = argparse.ArgumentParser(description='Compile selected files from a specified directory into a single file.')
     parser.add_argument('path', type=str, help='Path to the repository')
     parser.add_argument('-o', '--output', type=str, default='code.txt', help='Output file name (default: code.txt)')
     parser.add_argument('-e', '--exclude', nargs='*', default=[], help='List of directories to exclude')
     parser.add_argument('-m', '--message', type=str, help='Message to append at the end of the output file')
+    parser.add_argument('--extensions', nargs='+', default=['.py', '.md'], help='List of file extensions to include (default: .py .md)')
 
     args = parser.parse_args()
 
@@ -32,6 +33,10 @@ def main():
     repo_path = os.path.abspath(args.path)
     output_file = args.output
     excluded_dirs = set(args.exclude)
+    extensions = args.extensions
+
+    # Ensure extensions start with a dot
+    extensions = [ext if ext.startswith('.') else '.' + ext for ext in extensions]
 
     # Load .gitignore patterns
     gitignore_path = os.path.join(repo_path, '.gitignore')
@@ -42,13 +47,13 @@ def main():
     else:
         spec = None
 
-    # Collect all candidate .py files
+    # Collect all candidate files
     candidate_files = []
     for root, dirs, files in os.walk(repo_path):
         # Modify dirs in-place to exclude specified directories
         dirs[:] = [d for d in dirs if d not in excluded_dirs]
         for file in files:
-            if file.endswith('.py'):
+            if any(file.endswith(ext) for ext in extensions):
                 file_path = os.path.join(root, file)
                 # Compute the path relative to repo root
                 relative_path = os.path.relpath(file_path, repo_path)
@@ -86,8 +91,8 @@ def main():
         print(f"Error obtaining list of changed files: {e}")
         changed_files_relative = []
 
-    # Filter changed files to include only .py files in candidate_files
-    preselected_files = [f for f in changed_files_relative if f in candidate_files and f.endswith('.py')]
+    # Filter changed files to include only files in candidate_files with specified extensions
+    preselected_files = [f for f in changed_files_relative if f in candidate_files and any(f.endswith(ext) for ext in extensions)]
 
     # Create choices for the checkbox prompt, pre-selecting changed files
     choices = []
@@ -113,8 +118,17 @@ def main():
             file_path = os.path.join(repo_path, relative_path)
             # Write the relative file path to the output file
             outfile.write(f"{relative_path}\n")
+            # Determine the language for syntax highlighting
+            file_extension = os.path.splitext(relative_path)[1]
+            language = ''
+            if file_extension == '.py':
+                language = 'python'
+            elif file_extension == '.md':
+                language = 'markdown'
+            elif file_extension == '.txt':
+                language = 'plaintext'
             # Wrap the file content in triple backticks with language identifier
-            outfile.write('```python\n')
+            outfile.write(f'```{language}\n')
             try:
                 with open(file_path, 'r', encoding='utf-8') as infile:
                     outfile.write(infile.read())
@@ -125,6 +139,7 @@ def main():
         # Append the diff of the latest git commit
         try:
             # Change current working directory to repo_path
+
             os.chdir(repo_path)
 
             # Get the diff of the latest commit
