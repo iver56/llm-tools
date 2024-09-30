@@ -4,6 +4,8 @@ import os
 import argparse
 import subprocess
 
+import pyperclip
+
 
 def main():
     try:
@@ -222,6 +224,11 @@ def main():
             outfile.write("\n")
             outfile.write(args.message)
             outfile.write("\n")
+
+    with open(output_file, "r", encoding="utf-8") as file:
+        pyperclip.copy(file.read())
+
+    print("The text has been copied to the clipboard")
 
 
 if __name__ == "__main__":
