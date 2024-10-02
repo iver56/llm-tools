@@ -1,0 +1,1 @@
+A tool for compiling code/text files and optionally a git commit (diff) in a repository to a single text file, and finally copy it to the clipboard for convenience. It is useful for interaction with LLMs, like o1-preview by OpenAI.
