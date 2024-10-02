@@ -1,28 +1,13 @@
-#!/usr/bin/env python3
-
-import os
 import argparse
+import os
 import subprocess
 
+import pathspec
 import pyperclip
+from questionary import checkbox, Choice
 
 
 def main():
-    try:
-        from questionary import checkbox, Choice
-    except ImportError:
-        print("The 'questionary' library is required for interactive file selection.")
-        print("Please install it using 'pip install questionary' and try again.")
-        return
-
-    try:
-        import pathspec
-    except ImportError:
-        print("The 'pathspec' library is required to parse .gitignore files.")
-        print("Please install it using 'pip install pathspec' and try again.")
-        return
-
-    # Set up argument parser
     parser = argparse.ArgumentParser(
         description="Compile selected files from a specified directory into a single file."
     )
@@ -63,17 +48,14 @@ def main():
 
     args = parser.parse_args()
 
-    # Get the absolute path of the repository
     repo_path = os.path.abspath(args.path)
     output_file = args.output
     excluded_dirs = set(args.exclude)
     extensions = args.extensions
     commit = args.commit
 
-    # Ensure extensions start with a dot
     extensions = [ext if ext.startswith(".") else "." + ext for ext in extensions]
 
-    # Load .gitignore patterns
     gitignore_path = os.path.join(repo_path, ".gitignore")
     if os.path.exists(gitignore_path):
         with open(gitignore_path, "r") as f:
@@ -84,10 +66,8 @@ def main():
     else:
         spec = None
 
-    # Collect all candidate files
     candidate_files = []
     for root, dirs, files in os.walk(repo_path):
-        # Modify dirs in-place to exclude specified directories
         dirs[:] = [d for d in dirs if d not in excluded_dirs]
         for file in files:
             if any(file.endswith(ext) for ext in extensions):
@@ -104,17 +84,14 @@ def main():
         print("No candidate files found.")
         return
 
-    # Initialize preselected_files as an empty set
     preselected_files = set()
 
     # Only get the list of changed files if not omitting the diff
     if not args.no_diff:
         try:
-            # Change current working directory to repo_path
             original_cwd = os.getcwd()
             os.chdir(repo_path)
 
-            # Get the list of changed files
             result = subprocess.run(
                 ["git", "diff", "--name-only", commit],
                 stdout=subprocess.PIPE,
@@ -127,10 +104,8 @@ def main():
             else:
                 changed_files = result.stdout.strip().split("\n")
 
-            # Normalize the paths
             changed_files_relative = [os.path.normpath(f) for f in changed_files]
 
-            # Change back to original directory
             os.chdir(original_cwd)
 
             # Filter changed files to include only candidate files with specified extensions
@@ -163,13 +138,12 @@ def main():
         print("No files selected. Exiting.")
         return
 
-    # Open the output file in write mode
     with open(output_file, "w", encoding="utf-8") as outfile:
         for relative_path in selected_files:
             file_path = os.path.join(repo_path, relative_path)
-            # Write the relative file path to the output file
+
             outfile.write(f"{relative_path}\n")
-            # Determine the language for syntax highlighting
+
             file_extension = os.path.splitext(relative_path)[1]
             language = ""
             if file_extension == ".py":
@@ -178,7 +152,7 @@ def main():
                 language = "markdown"
             elif file_extension == ".txt":
                 language = "plaintext"
-            # Wrap the file content in triple backticks with language identifier
+
             outfile.write(f"```{language}\n")
             try:
                 with open(file_path, "r", encoding="utf-8") as infile:
@@ -190,10 +164,8 @@ def main():
         # Append the diff of the specified git commit if not omitted
         if not args.no_diff:
             try:
-                # Change current working directory to repo_path
                 os.chdir(repo_path)
 
-                # Get the diff of the specified commit
                 result = subprocess.run(
                     ["git", "diff", commit],
                     stdout=subprocess.PIPE,
@@ -206,10 +178,8 @@ def main():
                 else:
                     diff_output = result.stdout
 
-                # Change back to original directory
                 os.chdir(original_cwd)
 
-                # Write the diff to the output file
                 outfile.write(f"This is the diff of the commit '{commit}':\n")
                 outfile.write("```\n")
                 outfile.write(diff_output)
