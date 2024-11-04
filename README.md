@@ -6,8 +6,8 @@ It allows you to interactively select the files to include. If a commit is selec
 
 Usage examples:
 
-`python /path/to/repo --commit "HEAD~1" -m "Review the code changes in this commit. Make sure to comment all errors and typos.`
+`python compile_code.py /path/to/repo --commit "HEAD~1" -m "Review the code changes in this commit. Make sure to comment all errors and typos.`
 
-`python /path/to/repo -m "Study the refactoring I did in this commit. Now please apply similar changes to OtherClass.`
+`python compile_code.py /path/to/repo -m "Study the refactoring I did in this commit. Now please apply similar changes to OtherClass.`
 
-`python /path/to/repo --extensions .md .py --no-diff -m "Check for any discrepancies between the code and the documentation. Also comment any grammar errors."`
+`python compile_code.py /path/to/repo --extensions .md .py --no-diff -m "Check for any discrepancies between the code and the documentation. Also comment any grammar errors."`
