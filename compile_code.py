@@ -31,8 +31,8 @@ def main():
     parser.add_argument(
         "--extensions",
         nargs="+",
-        default=[".py", ".md"],
-        help="List of file extensions to include (default: .py .md)",
+        default=[".py", ".md", ".ini", ".yml"],
+        help="List of file extensions to include (default: .py .md, .ini, .yml)",
     )
     parser.add_argument(
         "--commit",
