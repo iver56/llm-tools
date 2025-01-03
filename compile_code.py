@@ -6,7 +6,6 @@ import pathspec
 import pyperclip
 from questionary import checkbox, Choice
 
-
 def main():
     parser = argparse.ArgumentParser(
         description="Compile selected files from a specified directory into a single file."
@@ -35,6 +34,11 @@ def main():
         help="List of file extensions to include (default: .py .md, .ini, .yml)",
     )
     parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Include all files, ignoring extensions",
+    )
+    parser.add_argument(
         "--commit",
         type=str,
         default="HEAD~1",
@@ -54,7 +58,8 @@ def main():
     extensions = args.extensions
     commit = args.commit
 
-    extensions = [ext if ext.startswith(".") else "." + ext for ext in extensions]
+    if not args.all:
+        extensions = [ext if ext.startswith(".") else "." + ext for ext in extensions]
 
     gitignore_path = os.path.join(repo_path, ".gitignore")
     if os.path.exists(gitignore_path):
@@ -70,7 +75,7 @@ def main():
     for root, dirs, files in os.walk(repo_path):
         dirs[:] = [d for d in dirs if d not in excluded_dirs]
         for file in files:
-            if any(file.endswith(ext) for ext in extensions):
+            if args.all or any(file.endswith(ext) for ext in extensions):
                 file_path = os.path.join(root, file)
                 # Compute the path relative to repo root
                 relative_path = os.path.relpath(file_path, repo_path)
@@ -112,7 +117,7 @@ def main():
             preselected_files = {
                 f
                 for f in changed_files_relative
-                if f in candidate_files and any(f.endswith(ext) for ext in extensions)
+                if f in candidate_files and (args.all or any(f.endswith(ext) for ext in extensions))
             }
 
         except Exception as e:
@@ -199,7 +204,6 @@ def main():
         pyperclip.copy(file.read())
 
     print("The text has been copied to the clipboard")
-
 
 if __name__ == "__main__":
     main()
