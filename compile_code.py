@@ -30,8 +30,8 @@ def main():
     parser.add_argument(
         "--extensions",
         nargs="+",
-        default=[".py", ".md", ".ini", ".yml"],
-        help="List of file extensions to include (default: .py .md, .ini, .yml)",
+        default=[".py", ".md", ".ini", ".yml", ".rs", ".toml"],
+        help="List of file extensions to include (default: .py .md, .ini, .yml, .rs, .toml)",
     )
     parser.add_argument(
         "--all",
@@ -45,9 +45,9 @@ def main():
         help="Git commit to use for the diff (default: HEAD~1)",
     )
     parser.add_argument(
-        "--no-diff",
+        "--diff",
         action="store_true",
-        help="Omit the git diff in the output and disregard the commit",
+        help="Include the git diff in the output and disregard the commit",
     )
 
     args = parser.parse_args()
@@ -92,7 +92,7 @@ def main():
     preselected_files = set()
 
     # Only get the list of changed files if not omitting the diff
-    if not args.no_diff:
+    if args.diff:
         try:
             original_cwd = os.getcwd()
             os.chdir(repo_path)
@@ -167,7 +167,7 @@ def main():
             outfile.write("\n```\n\n")  # Close the code block and add separation
 
         # Append the diff of the specified git commit if not omitted
-        if not args.no_diff:
+        if args.diff:
             try:
                 os.chdir(repo_path)
 
