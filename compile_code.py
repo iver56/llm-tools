@@ -30,8 +30,8 @@ def main():
     parser.add_argument(
         "--extensions",
         nargs="+",
-        default=[".py", ".md", ".ini", ".yml", ".rs", ".toml"],
-        help="List of file extensions to include (default: .py .md, .ini, .yml, .rs, .toml)",
+        default=[".py", ".md", ".ini", ".yml", ".rs", ".toml", ".cpp", ".hpp"],
+        help="List of file extensions to include (default: .py, .md, .ini, .yml, .rs, .toml, .cpp, .hpp)",
     )
     parser.add_argument(
         "--all",
