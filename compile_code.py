@@ -1,10 +1,68 @@
 import argparse
+import dataclasses
 import os
 import subprocess
 
 import pathspec
 import pyperclip
-from questionary import checkbox, Choice
+from prompt_toolkit.application import Application
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.layout import Layout
+from prompt_toolkit.layout.containers import HSplit, Window
+from prompt_toolkit.layout.controls import FormattedTextControl
+from prompt_toolkit.widgets import Box, CheckboxList, Frame
+from prompt_toolkit.filters import has_focus
+
+
+@dataclasses.dataclass
+class Choice:
+    title: str
+    checked: bool
+
+
+def checkbox_with_paging(message: str, choices: list[Choice]):
+    values = [(c.title, c.title) for c in choices]
+    cb_list = CheckboxList(values=values)
+
+    kb = KeyBindings()
+
+    @kb.add("pageup", filter=has_focus(cb_list))
+    def _(event):
+        cb_list._selected_index = max(0, cb_list._selected_index - 10)
+
+    @kb.add("pagedown", filter=has_focus(cb_list))
+    def _(event):
+        cb_list._selected_index = min(
+            len(cb_list.values) - 1, cb_list._selected_index + 10
+        )
+
+    @kb.add("enter", filter=has_focus(cb_list), eager=True)
+    def _(event):
+        event.app.exit(result=cb_list.current_values)
+
+    @kb.add("escape")
+    def _(event):
+        event.app.exit(result=[])
+
+    @kb.add("c-c")
+    def _(event):
+        event.app.exit(exception=KeyboardInterrupt())
+
+    root = HSplit(
+        [
+            Window(FormattedTextControl(message), height=1, dont_extend_height=True),
+            Box(Frame(cb_list), padding=1),
+        ]
+    )
+
+    app = Application(
+        layout=Layout(root, focused_element=cb_list),  # focus the list at start
+        key_bindings=kb,
+        mouse_support=True,
+        full_screen=True,
+    )
+    return app.run()
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -117,7 +175,8 @@ def main():
             preselected_files = {
                 f
                 for f in changed_files_relative
-                if f in candidate_files and (args.all or any(f.endswith(ext) for ext in extensions))
+                if f in candidate_files
+                and (args.all or any(f.endswith(ext) for ext in extensions))
             }
 
         except Exception as e:
@@ -134,10 +193,10 @@ def main():
     ]
 
     # Interactive selection of files
-    selected_files = checkbox(
+    selected_files = checkbox_with_paging(
         "Select the files to include in the output (use space to select, enter to confirm):",
         choices=choices,
-    ).ask()
+    )
 
     if not selected_files:
         print("No files selected. Exiting.")
@@ -204,6 +263,7 @@ def main():
         pyperclip.copy(file.read())
 
     print("The text has been copied to the clipboard")
+
 
 if __name__ == "__main__":
     main()
