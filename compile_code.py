@@ -107,6 +107,11 @@ def main():
         action="store_true",
         help="Include the git diff in the output and disregard the commit",
     )
+    parser.add_argument(
+        "--files",
+        nargs="*",
+        help="Space-separated file paths (relative to the repo path). If provided, these are used directly and the interactive prompt is skipped.",
+    )
 
     args = parser.parse_args()
 
@@ -129,79 +134,94 @@ def main():
     else:
         spec = None
 
-    candidate_files = []
-    for root, dirs, files in os.walk(repo_path):
-        dirs[:] = [d for d in dirs if d not in excluded_dirs]
-        for file in files:
-            if args.all or any(file.endswith(ext) for ext in extensions):
-                file_path = os.path.join(root, file)
-                # Compute the path relative to repo root
-                relative_path = os.path.relpath(file_path, repo_path)
-                relative_path = os.path.normpath(relative_path)
-                # Check if file is ignored by .gitignore
-                if spec and spec.match_file(relative_path):
-                    continue  # Skip ignored files
-                candidate_files.append(relative_path)
+    # If --files is given, validate and use them directly (skip interactive UI)
+    if args.files:
+        selected_files = []
+        for rel in args.files:
+            rel_norm = os.path.normpath(rel)
+            abs_path = os.path.abspath(os.path.join(repo_path, rel_norm))
+            # Ensure the file is inside the repo and exists
+            if not abs_path.startswith(repo_path + os.sep) and abs_path != repo_path:
+                print(f"Skipping path outside repo: {rel}")
+                continue
+            if not os.path.isfile(abs_path):
+                print(f"Skipping missing file: {rel}")
+                continue
+            selected_files.append(rel_norm)
 
-    if not candidate_files:
-        print("No candidate files found.")
-        return
-
-    preselected_files = set()
-
-    # Only get the list of changed files if not omitting the diff
-    if args.diff:
-        try:
-            original_cwd = os.getcwd()
-            os.chdir(repo_path)
-
-            result = subprocess.run(
-                ["git", "diff", "--name-only", commit],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            if result.returncode != 0:
-                print("Error getting list of changed files:", result.stderr)
-                changed_files = []
-            else:
-                changed_files = result.stdout.strip().split("\n")
-
-            changed_files_relative = [os.path.normpath(f) for f in changed_files]
-
-            os.chdir(original_cwd)
-
-            # Filter changed files to include only candidate files with specified extensions
-            preselected_files = {
-                f
-                for f in changed_files_relative
-                if f in candidate_files
-                and (args.all or any(f.endswith(ext) for ext in extensions))
-            }
-
-        except Exception as e:
-            print(f"Error obtaining list of changed files: {e}")
-            preselected_files = set()
+        if not selected_files:
+            print("No valid files from --files. Exiting.")
+            return
     else:
-        # If diff is omitted, disregard the commit and do not preselect any files
+        # Build candidate list (filtered by .gitignore and extensions unless --all)
+        candidate_files = []
+        for root, dirs, files in os.walk(repo_path):
+            dirs[:] = [d for d in dirs if d not in excluded_dirs]
+            for file in files:
+                if args.all or any(file.endswith(ext) for ext in extensions):
+                    file_path = os.path.join(root, file)
+                    relative_path = os.path.relpath(file_path, repo_path)
+                    relative_path = os.path.normpath(relative_path)
+                    if spec and spec.match_file(relative_path):
+                        continue
+                    candidate_files.append(relative_path)
+
+        if not candidate_files:
+            print("No candidate files found.")
+            return
+
         preselected_files = set()
 
-    # Create choices for the checkbox prompt, without pre-selecting any files if diff is omitted
-    choices = [
-        Choice(title=file, checked=(file in preselected_files))
-        for file in candidate_files
-    ]
+        # Only get the list of changed files if not omitting the diff
+        if args.diff:
+            try:
+                original_cwd = os.getcwd()
+                os.chdir(repo_path)
 
-    # Interactive selection of files
-    selected_files = checkbox_with_paging(
-        "Select the files to include in the output (use space to select, enter to confirm):",
-        choices=choices,
-    )
+                result = subprocess.run(
+                    ["git", "diff", "--name-only", commit],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    print("Error getting list of changed files:", result.stderr)
+                    changed_files = []
+                else:
+                    changed_files = result.stdout.strip().split("\n")
 
-    if not selected_files:
-        print("No files selected. Exiting.")
-        return
+                changed_files_relative = [os.path.normpath(f) for f in changed_files]
 
+                os.chdir(original_cwd)
+
+                preselected_files = {
+                    f
+                    for f in changed_files_relative
+                    if f in candidate_files
+                       and (args.all or any(f.endswith(ext) for ext in extensions))
+                }
+
+            except Exception as e:
+                print(f"Error obtaining list of changed files: {e}")
+                preselected_files = set()
+        else:
+            preselected_files = set()
+
+        choices = [
+            Choice(title=file, checked=(file in preselected_files))
+            for file in candidate_files
+        ]
+
+        selected_files = checkbox_with_paging(
+            "Select the files to include in the output (use space to select, enter to confirm):",
+            choices=choices,
+        )
+
+        if not selected_files:
+            print("No files selected. Exiting.")
+            return
+
+    # Write output
     with open(output_file, "w", encoding="utf-8") as outfile:
         for relative_path in selected_files:
             file_path = os.path.join(repo_path, relative_path)
@@ -223,11 +243,12 @@ def main():
                     outfile.write(infile.read())
             except Exception as e:
                 print(f"Error reading {file_path}: {e}")
-            outfile.write("\n```\n\n")  # Close the code block and add separation
+            outfile.write("\n```\n\n")
 
         # Append the diff of the specified git commit if not omitted
         if args.diff:
             try:
+                original_cwd = os.getcwd()
                 os.chdir(repo_path)
 
                 result = subprocess.run(
